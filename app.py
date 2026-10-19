@@ -12,20 +12,6 @@ st.set_page_config(
 
 DB_NAME = "pron_v32_limpio.db"
 
-# --- PROTOCOLO OBLIGATORIO DE RESETEO Y LIMPIEZA DE VARIABLES ---
-def resetear_variables_sesion():
-    """Elimina cualquier estado residual previo en la memoria de la sesión."""
-    keys_a_limpiar = [
-        'p_local_pct', 'p_empate_pct', 'p_visitante_pct', 
-        'estado_governance', 'saques_local', 'saques_visitante', 
-        'prob_no_corners', 'tarjetas_proyectadas'
-    ]
-    for key in keys_a_limpiar:
-        if key in st.session_state:
-            del st.session_state[key]
-    # Limpia la caché de Streamlit para forzar un cálculo fresco
-    st.cache_data.clear()
-
 # Inicialización segura de la base de datos SQLite
 def inicializar_db():
     conexion = sqlite3.connect(DB_NAME)
@@ -121,50 +107,50 @@ st.subheader("1. Configuración del Partido")
 liga_seleccionada = st.selectbox(
     "Selecciona la Liga / Torneo:", 
     options=list(EQUIPOS_POR_LIGA.keys()),
-    on_change=resetear_variables_sesion
+    key="select_liga"
 )
 
 equipos_disponibles = EQUIPOS_POR_LIGA[liga_seleccionada]
 
 col_eq1, col_eq2 = st.columns(2)
 with col_eq1:
-    equipo_local = st.selectbox("Equipo Local", options=equipos_disponibles, index=0, on_change=resetear_variables_sesion)
+    equipo_local = st.selectbox("Equipo Local", options=equipos_disponibles, index=0, key="select_local")
 with col_eq2:
     equipos_visitantes_disponibles = [eq for eq in equipos_disponibles if eq != equipo_local]
-    equipo_visitante = st.selectbox("Equipo Visitante", options=equipos_visitantes_disponibles, index=0 if len(equipos_visitantes_disponibles) > 0 else 0, on_change=resetear_variables_sesion)
+    equipo_visitante = st.selectbox("Equipo Visitante", options=equipos_visitantes_disponibles, index=0 if len(equipos_visitantes_disponibles) > 0 else 0, key="select_visitante")
 
 st.divider()
 
-# --- SECCIÓN 2: PARÁMETROS TÁCTICOS Y DE MODELADO ---
+# --- SECCIÓN 2: PARÁMETROS TÁCTICOS CON CLAVES DINÁMICAS (EVITA DATOS RESIDUALES) ---
 st.subheader("2. Variables y Parámetros Tácticos")
+
+# Creamos un identificador único basado en los equipos actuales para forzar el reinicio de inputs
+match_key = f"{equipo_local}_{equipo_visitante}"
 
 col_m1, col_m2 = st.columns(2)
 with col_m1:
-    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.65, step=0.05)
-    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=14.0, step=0.5)
-    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5)
+    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05, key=f"xg_l_{match_key}")
+    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5, key=f"rem_l_{match_key}")
+    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5, key=f"corn_{match_key}")
 with col_m2:
-    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.45, step=0.05)
-    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=12.5, step=0.5)
-    friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.25, step=0.05)
+    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05, key=f"xg_v_{match_key}")
+    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5, key=f"rem_v_{match_key}")
+    friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05, key=f"fric_{match_key}")
 
 # Protagonistas Clave (Player Props)
 st.markdown("#### 🏃‍♂️ Protagonistas Clave (Player Props)")
 col_j1, col_j2 = st.columns(2)
 with col_j1:
-    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Ousmane Dembélé")
-    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.4, step=0.1)
+    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local", key=f"j1_name_{match_key}")
+    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1, key=f"j1_rem_{match_key}")
 with col_j2:
-    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Lamine Yamal")
-    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.9, step=0.1)
+    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante", key=f"j2_name_{match_key}")
+    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1, key=f"j2_rem_{match_key}")
 
 st.divider()
 
-# --- BOTÓN DE EJECUCIÓN PRINCIPAL CON DIRECTRIZ DE PURGA ---
-if st.button("🚀 Ejecutar Auditoría Integral Pro (Purga & Cálculo)", type="primary", use_container_width=True):
-    
-    # DIRECTRIZ FORMAL DE REINICIO DE VARIABLES
-    resetear_variables_sesion()
+# --- BOTÓN DE EJECUCIÓN PRINCIPAL ---
+if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
     
     # --- CÁLCULO DE POISSON 1X2 (BARRIDO HASTA 6x6) ---
     max_goles = 6
@@ -211,7 +197,7 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro (Purga & Cálculo)", type="p
     tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
 
     # --- BLOQUE VISUAL UNIFICADO DE UN SOLO VISTAZO ---
-    st.success(f"🎯 Dictamen Táctico [RESETEADO]: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
+    st.success(f"🎯 Dictamen Táctico: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
     # 1. Tarjetas de Probabilidad 1X2 (KPIs)
     col_res1, col_res2, col_res3 = st.columns(3)
@@ -251,4 +237,4 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro (Purga & Cálculo)", type="p
     conexion.commit()
     conexion.close()
 
-    st.toast("Variables purgadas y auditoría registrada con éxito.", icon="🔄")
+    st.toast("Datos actualizados y purgados correctamente.", icon="🔄")

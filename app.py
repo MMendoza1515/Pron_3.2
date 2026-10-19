@@ -12,6 +12,20 @@ st.set_page_config(
 
 DB_NAME = "pron_v32_limpio.db"
 
+# --- PROTOCOLO OBLIGATORIO DE RESETEO Y LIMPIEZA DE VARIABLES ---
+def resetear_variables_sesion():
+    """Elimina cualquier estado residual previo en la memoria de la sesión."""
+    keys_a_limpiar = [
+        'p_local_pct', 'p_empate_pct', 'p_visitante_pct', 
+        'estado_governance', 'saques_local', 'saques_visitante', 
+        'prob_no_corners', 'tarjetas_proyectadas'
+    ]
+    for key in keys_a_limpiar:
+        if key in st.session_state:
+            del st.session_state[key]
+    # Limpia la caché de Streamlit para forzar un cálculo fresco
+    st.cache_data.clear()
+
 # Inicialización segura de la base de datos SQLite
 def inicializar_db():
     conexion = sqlite3.connect(DB_NAME)
@@ -106,17 +120,18 @@ st.subheader("1. Configuración del Partido")
 
 liga_seleccionada = st.selectbox(
     "Selecciona la Liga / Torneo:", 
-    options=list(EQUIPOS_POR_LIGA.keys())
+    options=list(EQUIPOS_POR_LIGA.keys()),
+    on_change=resetear_variables_sesion
 )
 
 equipos_disponibles = EQUIPOS_POR_LIGA[liga_seleccionada]
 
 col_eq1, col_eq2 = st.columns(2)
 with col_eq1:
-    equipo_local = st.selectbox("Equipo Local", options=equipos_disponibles, index=0)
+    equipo_local = st.selectbox("Equipo Local", options=equipos_disponibles, index=0, on_change=resetear_variables_sesion)
 with col_eq2:
     equipos_visitantes_disponibles = [eq for eq in equipos_disponibles if eq != equipo_local]
-    equipo_visitante = st.selectbox("Equipo Visitante", options=equipos_visitantes_disponibles, index=0 if len(equipos_visitantes_disponibles) > 0 else 0)
+    equipo_visitante = st.selectbox("Equipo Visitante", options=equipos_visitantes_disponibles, index=0 if len(equipos_visitantes_disponibles) > 0 else 0, on_change=resetear_variables_sesion)
 
 st.divider()
 
@@ -145,8 +160,11 @@ with col_j2:
 
 st.divider()
 
-# --- BOTÓN DE EJECUCIÓN PRINCIPAL ---
-if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
+# --- BOTÓN DE EJECUCIÓN PRINCIPAL CON DIRECTRIZ DE PURGA ---
+if st.button("🚀 Ejecutar Auditoría Integral Pro (Purga & Cálculo)", type="primary", use_container_width=True):
+    
+    # DIRECTRIZ FORMAL DE REINICIO DE VARIABLES
+    resetear_variables_sesion()
     
     # --- CÁLCULO DE POISSON 1X2 (BARRIDO HASTA 6x6) ---
     max_goles = 6
@@ -193,7 +211,7 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_contai
     tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
 
     # --- BLOQUE VISUAL UNIFICADO DE UN SOLO VISTAZO ---
-    st.success(f"🎯 Dictamen Táctico: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
+    st.success(f"🎯 Dictamen Táctico [RESETEADO]: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
     # 1. Tarjetas de Probabilidad 1X2 (KPIs)
     col_res1, col_res2, col_res3 = st.columns(3)
@@ -233,4 +251,4 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_contai
     conexion.commit()
     conexion.close()
 
-    st.toast("Auditoría integral registrada en SQLite con éxito.", icon="💾")
+    st.toast("Variables purgadas y auditoría registrada con éxito.", icon="🔄")

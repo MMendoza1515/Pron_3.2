@@ -121,35 +121,36 @@ with col_eq2:
 
 st.divider()
 
-# --- SECCIÓN 2: FORMULARIO DE VARIABLES TÁCTICAS ---
-# El formulario encapsula los inputs y evita recargas a medias; los datos solo viajan al hacer clic en el botón de submit.
-with st.form("form_auditoria"):
-    st.subheader("2. Variables y Parámetros Tácticos")
+# --- SECCIÓN 2: VARIABLES Y PARÁMETROS TÁCTICOS (LLAVES DINÁMICAS PURAS) ---
+st.subheader("2. Variables y Parámetros Tácticos")
 
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05)
-        remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5)
-        lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5)
-    with col_m2:
-        lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05)
-        remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5)
-        friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05)
+# Identificador único por partido para evitar datos residuales en caché
+match_key = f"{liga_seleccionada}_{equipo_local}_{equipo_visitante}"
 
-    st.markdown("#### 🏃‍♂️ Protagonistas Clave (Player Props)")
-    col_j1, col_j2 = st.columns(2)
-    with col_j1:
-        jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local")
-        j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1)
-    with col_j2:
-        jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante")
-        j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1)
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05, key=f"xg_l_{match_key}")
+    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5, key=f"rem_l_{match_key}")
+    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5, key=f"corn_{match_key}")
+with col_m2:
+    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05, key=f"xg_v_{match_key}")
+    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5, key=f"rem_v_{match_key}")
+    friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05, key=f"fric_{match_key}")
 
-    # Botón de ejecución dentro del formulario
-    submit_auditoria = st.form_submit_button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True)
+st.markdown("#### 🏃‍♂️ Protagonistas Clave (Player Props)")
+col_j1, col_j2 = st.columns(2)
+with col_j1:
+    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local", key=f"j1_name_{match_key}")
+    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1, key=f"j1_rem_{match_key}")
+with col_j2:
+    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante", key=f"j2_name_{match_key}")
+    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1, key=f"j2_rem_{match_key}")
 
-# --- PROCESAMIENTO Y ACTUALIZACIÓN AL DAR CLIC ---
-if submit_auditoria:
+st.divider()
+
+# --- BOTÓN DE EJECUCIÓN PRINCIPAL ---
+if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
+    
     # --- CÁLCULO DE POISSON 1X2 (BARRIDO HASTA 6x6) ---
     max_goles = 6
     prob_local_win = 0.0
@@ -194,7 +195,7 @@ if submit_auditoria:
     prob_no_corners = ((math.exp(-lambda_10min) * (lambda_10min ** 0)) / math.factorial(0)) * 100
     tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
 
-    # Guardamos en session_state para mantener la visualización activa
+    # Guardamos los resultados calculados directamente en session_state
     st.session_state.p_local_pct = p_local_pct
     st.session_state.p_empate_pct = p_empate_pct
     st.session_state.p_visitante_pct = p_visitante_pct
@@ -203,7 +204,11 @@ if submit_auditoria:
     st.session_state.saques_visitante = saques_visitante
     st.session_state.prob_no_corners = prob_no_corners
     st.session_state.tarjetas_proyectadas = tarjetas_proyectadas
-    st.session_state.datos_activos = True
+    st.session_state.j1_nombre = jugador_1
+    st.session_state.j2_nombre = jugador_2
+    st.session_state.j1_rem = j1_remates
+    st.session_state.j2_rem = j2_remates
+    st.session_state.calculo_listo = True
 
     # PERSISTENCIA EN SQLITE
     conexion = sqlite3.connect(DB_NAME)
@@ -215,9 +220,9 @@ if submit_auditoria:
     conexion.commit()
     conexion.close()
 
-# --- RENDERIZADO DE RESULTADOS ---
-if st.session_state.get('datos_activos', False):
-    st.success(f"🎯 Dictamen Táctico Actualizado: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
+# --- RENDERIZADO DINÁMICO DE RESULTADOS ---
+if st.session_state.get('calculo_listo', False):
+    st.success(f"🎯 Dictamen Táctico: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
     # 1. Tarjetas de Probabilidad 1X2 (KPIs)
     col_res1, col_res2, col_res3 = st.columns(3)
@@ -242,11 +247,11 @@ if st.session_state.get('datos_activos', False):
     # 3. Tabla de Protagonistas Clave
     st.markdown("### 🏃‍♂️ Rendimiento de Protagonistas Clave")
     df_jugadores = pd.DataFrame([
-        {"Jugador": jugador_1, "Equipo": equipo_local, "Remates P/G": j1_remates, "Impacto": "Desborde / Transición"},
-        {"Jugador": jugador_2, "Equipo": equipo_visitante, "Remates P/G": j2_remates, "Impacto": "Ruptura / Bloque Bajo"}
+        {"Jugador": st.session_state.j1_nombre, "Equipo": equipo_local, "Remates P/G": st.session_state.j1_rem, "Impacto": "Desborde / Transición"},
+        {"Jugador": st.session_state.j2_nombre, "Equipo": equipo_visitante, "Remates P/G": st.session_state.j2_rem, "Impacto": "Ruptura / Bloque Bajo"}
     ])
     st.dataframe(df_jugadores, use_container_width=True)
 
-    st.toast("Datos actualizados correctamente con los nuevos parámetros.", icon="🔄")
+    st.toast("Auditoría procesada con los valores actuales.", icon="🔄")
 else:
-    st.info("ℹ️ Modifica los parámetros en el formulario superior y haz clic en **'Ejecutar Auditoría Integral Pro'** para generar y actualizar los resultados.")
+    st.info("ℹ️ Ajusta los parámetros tácticos y haz clic en **'Ejecutar Auditoría Integral Pro'** para procesar los cálculos.")

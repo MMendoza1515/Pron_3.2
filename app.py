@@ -29,11 +29,6 @@ def inicializar_db():
 
 inicializar_db()
 
-# --- CONTROL DE ESTADO: REINICIO AL CAMBIAR DE EQUIPOS ---
-# Si el usuario cambia de equipo o liga, limpiamos el estado anterior para que no muestre resultados viejos
-if 'ultimo_partido' not in st.session_state:
-    st.session_state.ultimo_partido = ""
-
 # --- DICCIONARIO AMPLIADO MUNDIAL DE LIGAS Y TORNEOS ---
 EQUIPOS_POR_LIGA = {
     "La Liga (España)": [
@@ -124,42 +119,49 @@ with col_eq2:
     equipos_visitantes_disponibles = [eq for eq in equipos_disponibles if eq != equipo_local]
     equipo_visitante = st.selectbox("Equipo Visitante", options=equipos_visitantes_disponibles, index=0 if len(equipos_visitantes_disponibles) > 0 else 0, key="select_visitante")
 
-# Detectar si se cambió de partido para limpiar resultados anteriores en pantalla
-partido_actual = f"{liga_seleccionada}:{equipo_local}-{equipo_visitante}"
-if st.session_state.ultimo_partido != partido_actual:
-    st.session_state.ultimo_partido = partido_actual
-    if 'auditoria_ejecutada' in st.session_state:
-        st.session_state.auditoria_ejecutada = False
-
 st.divider()
 
-# --- SECCIÓN 2: VARIABLES Y PARÁMETROS TÁCTICOS ---
+# --- SECCIÓN 2: VARIABLES Y PARÁMETROS TÁCTICOS CON LLAVES DINÁMICAS ---
 st.subheader("2. Variables y Parámetros Tácticos")
+
+# Llave compuesta única por cada combinación de partido para obligar a limpiar y reiniciar inputs
+match_id_key = f"{liga_seleccionada}_{equipo_local}_{equipo_visitante}"
 
 col_m1, col_m2 = st.columns(2)
 with col_m1:
-    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05, key="input_xg_local")
-    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5, key="input_rem_local")
-    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5, key="input_corners")
+    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05, key=f"xg_l_{match_id_key}")
+    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5, key=f"rem_l_{match_id_key}")
+    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5, key=f"corn_{match_id_key}")
 with col_m2:
-    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05, key="input_xg_visitante")
-    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5, key="input_rem_visitante")
-    friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05, key="input_friccion")
+    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05, key=f"xg_v_{match_id_key}")
+    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5, key=f"rem_v_{match_id_key}")
+    friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05, key=f"fric_{match_id_key}")
 
 # Protagonistas Clave (Player Props)
 st.markdown("#### 🏃‍♂️ Protagonistas Clave (Player Props)")
 col_j1, col_j2 = st.columns(2)
 with col_j1:
-    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local", key="input_j1_name")
-    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1, key="input_j1_rem")
+    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local", key=f"j1_name_{match_id_key}")
+    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1, key=f"j1_rem_{match_id_key}")
 with col_j2:
-    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante", key="input_j2_name")
-    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1, key="input_j2_rem")
+    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante", key=f"j2_name_{match_id_key}")
+    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1, key=f"j2_rem_{match_id_key}")
 
 st.divider()
 
+# --- CONTROL DE ESTADO PARA EJECUCIÓN BAJO DEMANDA ---
+if 'auditoria_ejecutada' not in st.session_state:
+    st.session_state.auditoria_ejecutada = False
+
+# Si cambia el partido, apagamos el estado anterior para limpiar la pantalla de resultados viejos
+if 'partido_previo' not in st.session_state:
+    st.session_state.partido_previo = match_id_key
+
+if st.session_state.partido_previo != match_id_key:
+    st.session_state.partido_previo = match_id_key
+    st.session_state.auditoria_ejecutada = False
+
 # --- BOTÓN DE EJECUCIÓN PRINCIPAL ---
-# Las variables solo se procesan y muestran si se presiona este botón
 if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
     st.session_state.auditoria_ejecutada = True
     
@@ -218,8 +220,7 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_contai
     conexion.close()
 
 # --- RENDERIZADO CONDICIONAL DE RESULTADOS ---
-# Si no se ha dado clic al botón o se cambió de partido, los resultados permanecen limpios/invisibles
-if st.session_state.get('auditoria_ejecutada', False):
+if st.session_state.auditoria_ejecutada:
     st.success(f"🎯 Dictamen Táctico: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
     # 1. Tarjetas de Probabilidad 1X2 (KPIs)
@@ -238,7 +239,7 @@ if st.session_state.get('auditoria_ejecutada', False):
         | **Tendencia Matemática Principal** | `{'Local Favorecido' if st.session_state.p_local_pct > st.session_state.p_visitante_pct else 'Visitante Favorecido'}` ({max(st.session_state.p_local_pct, st.session_state.p_empate_pct, st.session_state.p_visitante_pct):.1f}%) |
         | **Volumen de Saques de Puerta** | **{equipo_local}:** `{st.session_state.saques_local}` \| **{equipo_visitante}:** `{st.session_state.saques_visitante}` |
         | **Dinámica de Córneres (<10')** | Probabilidad de que no haya córneres en los primeros 10': **{st.session_state.prob_no_corners:.1f}%** |
-        | **Fricción Arbitral & Disciplina** | Coeficiente `{friccion_arbitral}` con **{st.session_state.tarjetas_proyectadas}** amarillas estimadas |
+        | **Fricción Arbitral & Disciplina** | Coeficiente con **{st.session_state.tarjetas_proyectadas}** amarillas estimadas |
         """
     )
 
@@ -250,6 +251,6 @@ if st.session_state.get('auditoria_ejecutada', False):
     ])
     st.dataframe(df_jugadores, use_container_width=True)
 
-    st.toast("Auditoría generada desde cero con éxito.", icon="✅")
+    st.toast("Auditoría generada con éxito.", icon="✅")
 else:
-    st.info("ℹ️ Selecciona tu partido y haz clic en **'Ejecutar Auditoría Integral Pro'** para calcular los datos y mostrar el dictamen táctico.")
+    st.info("ℹ️ Configura los parámetros y haz clic en **'Ejecutar Auditoría Integral Pro'** para calcular los datos del partido.")

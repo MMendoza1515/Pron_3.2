@@ -5,7 +5,7 @@ import streamlit as st
 
 # Configuración inicial de la página
 st.set_page_config(
-    page_title="pron v3.2 Pro - Dashboard", 
+    page_title="pron v3.2 Pro - Centro Táctico", 
     page_icon="⚽", 
     layout="centered"
 )
@@ -45,7 +45,6 @@ inicializar_db()
 
 # --- DICCIONARIO AMPLIADO MUNDIAL DE LIGAS Y TORNEOS ---
 EQUIPOS_POR_LIGA = {
-    # --- LIGAS TOP EUROPA ---
     "La Liga (España)": [
         "Real Madrid", "Barcelona", "Atlético de Madrid", 
         "Getafe", "Rayo Vallecano", "Real Sociedad", "Villarreal", "Athletic Club", "Sevilla", "Valencia"
@@ -66,8 +65,6 @@ EQUIPOS_POR_LIGA = {
         "Trabzonspor", "Besiktas", "Galatasaray", 
         "Fenerbahce", "Basaksehir", "Adana Demirspor", "Sivasspor", "Antalyaspor"
     ],
-
-    # --- AMÉRICA Y LATINOAMÉRICA ---
     "Liga Profesional (Argentina)": [
         "River Plate", "Boca Juniors", "Racing Club", 
         "Independiente", "San Lorenzo", "Estudiantes de La Plata", "Vélez Sarsfield", "Talleres"
@@ -88,8 +85,6 @@ EQUIPOS_POR_LIGA = {
         "Alianza FC", "CD FAS", "CD Águila", 
         "Isidro Metapán", "Municipal Limeño", "11 Deportivo", "Fuerte San Francisco", "Dragón"
     ],
-
-    # --- TORNEOS INTERNACIONALES DE CLUBES ---
     "UEFA Champions League": [
         "Real Madrid", "Manchester City", "Bayern Múnich", "Paris Saint-Germain",
         "Inter de Milán", "Arsenal", "Barcelona", "Leverkusen", "Atlético de Madrid", "Liverpool"
@@ -98,8 +93,6 @@ EQUIPOS_POR_LIGA = {
         "Flamengo", "Palmeiras", "River Plate", "Boca Juniors",
         "Fluminense", "São Paulo", "Atlético Mineiro", "Colo-Colo", "Peñarol", "Liga de Quito"
     ],
-
-    # --- TORNEOS DE SELECCIONES ---
     "Eliminatorias / Amistosos (Selecciones)": [
         "Argentina", "Brasil", "España", "Francia", 
         "Inglaterra", "Alemania", "Portugal", "México", 
@@ -118,15 +111,15 @@ EQUIPOS_POR_LIGA = {
 
 # --- ENCABEZADO ---
 st.title("⚽ Protocolo pron v3.2 Pro")
-st.caption("Dashboard Analítico y Auditoría Móvil de Partidos")
+st.caption("Centro de Mando Táctico y Auditoría de Apuestas")
 
 st.divider()
 
-# --- SECCIÓN 1: SELECCIÓN DE LIGA Y EQUIPOS ---
-st.subheader("1. Selección del Encuentro")
+# --- SECCIÓN 1: SELECTBOX DE CONFIGURACIÓN ---
+st.subheader("1. Configuración del Encuentro")
 
 liga_seleccionada = st.selectbox(
-    "Selecciona la Liga / Torneo Mundial:", 
+    "Selecciona la Liga / Torneo:", 
     options=list(EQUIPOS_POR_LIGA.keys())
 )
 
@@ -134,88 +127,101 @@ equipos_disponibles = EQUIPOS_POR_LIGA[liga_seleccionada]
 
 col_eq1, col_eq2 = st.columns(2)
 with col_eq1:
-    equipo_local = st.selectbox(
-        "Equipo Local", 
-        options=equipos_disponibles,
-        index=0
-    )
+    equipo_local = st.selectbox("Equipo Local", options=equipos_disponibles, index=0)
 with col_eq2:
     equipos_visitantes_disponibles = [eq for eq in equipos_disponibles if eq != equipo_local]
-    equipo_visitante = st.selectbox(
-        "Equipo Visitante", 
-        options=equipos_visitantes_disponibles,
-        index=0 if len(equipos_visitantes_disponibles) > 0 else 0
-    )
+    equipo_visitante = st.selectbox("Equipo Visitante", options=equipos_visitantes_disponibles, index=0 if len(equipos_visitantes_disponibles) > 0 else 0)
 
 st.divider()
 
-# --- SECCIÓN 2: PARÁMETROS ESTADÍSTICOS ---
-st.subheader("2. Métrica Base del Partido")
+# --- SECCIÓN 2: PARÁMETROS MATEMÁTICOS Y ESTADÍSTICOS ---
+st.subheader("2. Variables de Modelado")
 
 col_m1, col_m2 = st.columns(2)
 with col_m1:
     lambda_goles = st.number_input("λ Goles Totales (xG)", value=2.6, step=0.1)
-    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=12.5, step=0.5)
+    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5)
 with col_m2:
     lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.1)
-    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.0, step=0.5)
+    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5)
 
 friccion_arbitral = st.slider(
     "Índice de Fricción Arbitral / Tarjetas", 
     min_value=0.80, max_value=2.00, value=1.20, step=0.05,
-    help="1.00 = Promedio normal, >1.20 = Partido cerrado/frictivo"
+    help="1.00 = Promedio normal, >1.20 = Partido cerrado o friccionado"
 )
 
-# --- SECCIÓN 3: PROTAGONISTAS CLAVE ---
-st.subheader("3. Protagonistas Clave")
-
+# Protagonistas Clave
 col_j1, col_j2 = st.columns(2)
 with col_j1:
     jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local")
     j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1)
 with col_j2:
     jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante")
-    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.9, step=0.1)
+    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1)
 
 st.divider()
 
-# --- BOTÓN PRINCIPAL DE EJECUCIÓN ---
-if st.button("🚀 Ejecutar Auditoría pron v3.2 Pro", type="primary", use_container_width=True):
-    # CÁLCULOS MATEMÁTICOS (POISSON)
+# --- BOTÓN DE EJECUCIÓN ---
+if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
+    
+    # --- CÁLCULOS CUANTITATIVOS ---
     lambda_10min = lambda_corners * (10 / 90)
     prob_no_corners = (math.exp(-lambda_10min) * (lambda_10min ** 0)) / math.factorial(0)
-    porcentaje_no_corners = prob_no_corners * 100
+    p_modelo = prob_no_corners * 100  # En porcentaje
 
-    # Remates y Saques de Puerta
+    # Estimación de mercado implícita de referencia (ej. cuota simétrica del 50%)
+    p_implicita = 50.0 
+    delta_p = p_modelo - p_implicita
+
+    # Lógica de Gobernanza y Clasificación (Estelar vs Base)
+    if p_modelo >= 40.0:
+        estado_governance = "⭐ APROBADO ESTELAR"
+        color_badge = "success"
+    elif p_modelo >= 25.0:
+        estado_governance = "✅ APROBADO BASE"
+        color_badge = "info"
+    else:
+        estado_governance = "⚠️ REVISAR RIESGO"
+        color_badge = "warning"
+
+    # Dinámica de Saques de Puerta y Remates
     t_puerta_local = round(remates_local * 0.38, 1)
     t_puerta_visitante = round(remates_visitante * 0.38, 1)
     saques_visitante = round(remates_local - t_puerta_local, 1)
     saques_local = round(remates_visitante - t_puerta_visitante, 1)
     remates_totales = remates_local + remates_visitante
-
-    # Disciplina
     tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
 
-    # REPORTE VISUAL EN TARJETAS
-    st.success(f"¡Auditoría Exitosa: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})!")
+    # --- BLOQUE UNIFICADO DE RESULTADOS (DE UN SOLO VISTAZO) ---
+    st.success(f"📋 Auditoría Completa: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
-    st.subheader("📊 Resultados de la Auditoría")
+    # Tarjetas de Indicadores Principales (KPIs)
+    kpi1, kpi2, kpi3 = st.columns(3)
+    kpi1.metric("Prob. No Córners <10'", f"{p_modelo:.1f}%", f"Δ {delta_p:+.1f}%")
+    kpi2.metric("Tarjetas Amarillas Est.", f"{tarjetas_proyectadas}")
+    kpi3.metric("Remates Totales", f"{remates_totales}")
 
-    m_col1, m_col2 = st.columns(2)
-    m_col1.metric("Prob. No Córners <10'", f"{porcentaje_no_corners:.1f}%")
-    m_col2.metric("Tarjetas Amarillas Est.", f"{tarjetas_proyectadas}")
-
-    st.markdown("#### 🎯 Remates & Saques de Puerta")
-    st.info(
-        f"• **Remates Totales:** {remates_totales} ({equipo_local}: {remates_local} | {equipo_visitante}: {remates_visitante})\n"
-        f"• **Saques de Puerta para {equipo_visitante}:** {saques_visitante} *(por desvíos de {equipo_local})*\n"
-        f"• **Saques de Puerta para {equipo_local}:** {saques_local} *(por desvíos de {equipo_visitante})*"
+    # Panel de Gobernanza Estructurado
+    st.markdown("### 🏛️ Matriz de Gobernanza & Decisión")
+    st.markdown(
+        f"""
+        | Componente Táctico | Detalle de Auditoría |
+        | :--- | :--- |
+        | **Estado de Validación** | **{estado_governance}** |
+        | **Probabilidad del Modelo ($P_m$)** | `{p_modelo:.2f}%` |
+        | **Probabilidad Implícita de Mercado** | `{p_implicita:.2f}%` |
+        | **Margen de Valor ($\Delta p$)** | `{delta_p:+.2f}%` *(Indicador de Valor Matemático)* |
+        | **Volumen de Saques de Puerta** | `{equipo_visitante}: {saques_visitante}` \| `{equipo_local}: {saques_local}` |
+        | **Fricción & Disciplina** | Coeficiente arbitral de `{friccion_arbitral}` con `{tarjetas_proyectadas}` amonestaciones estimadas. |
+        """
     )
 
-    st.markdown("#### 🏃‍♂️ Jugadores Registrados")
+    # Tabla Interactiva de Protagonistas (Player Props)
+    st.markdown("### 🏃‍♂️ Rendimiento de Protagonistas Clave")
     df_jugadores = pd.DataFrame([
-        {"Jugador": jugador_1, "Equipo": equipo_local, "Remates P/G": j1_remates},
-        {"Jugador": jugador_2, "Equipo": equipo_visitante, "Remates P/G": j2_remates}
+        {"Jugador": jugador_1, "Equipo": equipo_local, "Liga / Torneo": liga_seleccionada, "Remates P/G": j1_remates},
+        {"Jugador": jugador_2, "Equipo": equipo_visitante, "Liga / Torneo": liga_seleccionada, "Remates P/G": j2_remates}
     ])
     st.dataframe(df_jugadores, use_container_width=True)
 
@@ -225,8 +231,8 @@ if st.button("🚀 Ejecutar Auditoría pron v3.2 Pro", type="primary", use_conta
     cursor.execute("""
         INSERT INTO governance_log_v32 (match_id, market_category, market_selected, model_probability, implied_probability, delta_p, governance_status)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (101, f"Auditoría Pro - {liga_seleccionada}", f"{equipo_local} vs {equipo_visitante}", round(prob_no_corners, 4), 0.50, round(prob_no_corners - 0.50, 4), "APROBADO_MUNDIAL"))
+    """, (202, f"Auditoría Unificada - {liga_seleccionada}", f"{equipo_local} vs {equipo_visitante}", round(p_modelo/100, 4), 0.50, round(delta_p/100, 4), estado_governance))
     conexion.commit()
     conexion.close()
 
-    st.toast("Gobernanza guardada con éxito en SQLite.", icon="💾")
+    st.toast("Datos de gobernanza guardados en SQLite con éxito.", icon="💾")

@@ -5,7 +5,7 @@ import streamlit as st
 
 # Configuración inicial de la página
 st.set_page_config(
-    page_title="pron v3.2 Pro - Centro Táctico", 
+    page_title="pron v3.2 Pro - Centro de Decisiones", 
     page_icon="⚽", 
     layout="centered"
 )
@@ -17,25 +17,10 @@ def inicializar_db():
     conexion = sqlite3.connect(DB_NAME)
     cursor = conexion.cursor()
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS matches_v32 (
-            match_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            league TEXT, match_date TEXT, home_team TEXT, away_team TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS player_stats_v32 (
-            player_stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            player_name TEXT, team_name TEXT, league TEXT,
-            goals_ranking INTEGER, shots_per_game REAL,
-            yellow_red_cards INTEGER, fouls_drawn REAL
-        )
-    """)
-    cursor.execute("""
         CREATE TABLE IF NOT EXISTS governance_log_v32 (
             log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            match_id INTEGER, market_category TEXT, market_selected TEXT,
-            model_probability REAL, implied_probability REAL, delta_p REAL,
-            governance_status TEXT
+            match_date TEXT, home_team TEXT, away_team TEXT,
+            p_local REAL, p_empate REAL, p_visitante REAL, governance_status TEXT
         )
     """)
     conexion.commit()
@@ -111,12 +96,12 @@ EQUIPOS_POR_LIGA = {
 
 # --- ENCABEZADO ---
 st.title("⚽ Protocolo pron v3.2 Pro")
-st.caption("Centro de Mando Táctico y Auditoría de Apuestas")
+st.caption("Centro de Decisiones y Probabilidades 1X2")
 
 st.divider()
 
-# --- SECCIÓN 1: SELECTBOX DE CONFIGURACIÓN ---
-st.subheader("1. Configuración del Encuentro")
+# --- SECCIÓN 1: CONFIGURACIÓN DEL ENCUENTRO ---
+st.subheader("1. Configuración del Partido")
 
 liga_seleccionada = st.selectbox(
     "Selecciona la Liga / Torneo:", 
@@ -134,105 +119,91 @@ with col_eq2:
 
 st.divider()
 
-# --- SECCIÓN 2: PARÁMETROS MATEMÁTICOS Y ESTADÍSTICOS ---
-st.subheader("2. Variables de Modelado")
+# --- SECCIÓN 2: PARÁMETROS DE EXPECTATIVA DE GOLES (xG) ---
+st.subheader("2. Expectativa de Goles (xG) para Poisson")
 
 col_m1, col_m2 = st.columns(2)
 with col_m1:
-    lambda_goles = st.number_input("λ Goles Totales (xG)", value=2.6, step=0.1)
-    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5)
+    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05)
+    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5)
 with col_m2:
-    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.1)
-    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5)
-
-friccion_arbitral = st.slider(
-    "Índice de Fricción Arbitral / Tarjetas", 
-    min_value=0.80, max_value=2.00, value=1.20, step=0.05,
-    help="1.00 = Promedio normal, >1.20 = Partido cerrado o friccionado"
-)
-
-# Protagonistas Clave
-col_j1, col_j2 = st.columns(2)
-with col_j1:
-    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local")
-    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1)
-with col_j2:
-    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante")
-    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1)
+    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05)
+    friccion_arbitral = st.slider("Índice de Fricción Arbitral", min_value=0.80, max_value=2.00, value=1.20, step=0.05)
 
 st.divider()
 
-# --- BOTÓN DE EJECUCIÓN ---
-if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
+# --- BOTÓN DE EJECUCIÓN PRINCIPAL ---
+if st.button("🚀 Ejecutar Auditoría de Probabilidades 1X2", type="primary", use_container_width=True):
     
-    # --- CÁLCULOS CUANTITATIVOS ---
-    lambda_10min = lambda_corners * (10 / 90)
-    prob_no_corners = (math.exp(-lambda_10min) * (lambda_10min ** 0)) / math.factorial(0)
-    p_modelo = prob_no_corners * 100  # En porcentaje
+    # --- CÁLCULO DE POISSON 1X2 (BARRIDO DE GOLES HASTA 6x6) ---
+    max_goles = 6
+    prob_local_win = 0.0
+    prob_empate = 0.0
+    prob_visitante_win = 0.0
 
-    # Estimación de mercado implícita de referencia (ej. cuota simétrica del 50%)
-    p_implicita = 50.0 
-    delta_p = p_modelo - p_implicita
+    for i in range(max_goles + 1):
+        for j in range(max_goles + 1):
+            p_i = (math.exp(-lambda_local) * (lambda_local ** i)) / math.factorial(i)
+            p_j = (math.exp(-lambda_visitante) * (lambda_visitante ** j)) / math.factorial(j)
+            p_match = p_i * p_j
+            
+            if i > j:
+                prob_local_win += p_match
+            elif i == j:
+                prob_empate += p_match
+            else:
+                prob_visitante_win += p_match
 
-    # Lógica de Gobernanza y Clasificación (Estelar vs Base)
-    if p_modelo >= 40.0:
-        estado_governance = "⭐ APROBADO ESTELAR"
-        color_badge = "success"
-    elif p_modelo >= 25.0:
-        estado_governance = "✅ APROBADO BASE"
-        color_badge = "info"
+    # Normalización porcentual
+    total_prob = prob_local_win + prob_empate + prob_visitante_win
+    p_local_pct = (prob_local_win / total_prob) * 100
+    p_empate_pct = (prob_empate / total_prob) * 100
+    p_visitante_pct = (prob_visitante_win / total_prob) * 100
+
+    # Lógica de Gobernanza y Clasificación de Apuesta
+    max_p = max(p_local_pct, p_empate_pct, p_visitante_pct)
+    if max_p >= 55.0:
+        estado_governance = "⭐ APROBADO ESTELAR (Alta Certeza)"
+    elif max_p >= 42.0:
+        estado_governance = "✅ APROBADO BASE (Valor Moderado)"
     else:
-        estado_governance = "⚠️ REVISAR RIESGO"
-        color_badge = "warning"
+        estado_governance = "⚠️ REVISAR RIESGO (Alta Incertidumbre)"
 
-    # Dinámica de Saques de Puerta y Remates
-    t_puerta_local = round(remates_local * 0.38, 1)
-    t_puerta_visitante = round(remates_visitante * 0.38, 1)
-    saques_visitante = round(remates_local - t_puerta_local, 1)
-    saques_local = round(remates_visitante - t_puerta_visitante, 1)
-    remates_totales = remates_local + remates_visitante
+    # Análisis de córneres y tarjetas complementarias
+    lambda_10min = lambda_corners * (10 / 90)
+    prob_no_corners = ((math.exp(-lambda_10min) * (lambda_10min ** 0)) / math.factorial(0)) * 100
     tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
 
-    # --- BLOQUE UNIFICADO DE RESULTADOS (DE UN SOLO VISTAZO) ---
-    st.success(f"📋 Auditoría Completa: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
+    # --- BLOQUE VISUAL UNIFICADO DE UN SOLO VISTAZO ---
+    st.success(f"🎯 Dictamen Táctico: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
-    # Tarjetas de Indicadores Principales (KPIs)
-    kpi1, kpi2, kpi3 = st.columns(3)
-    kpi1.metric("Prob. No Córners <10'", f"{p_modelo:.1f}%", f"Δ {delta_p:+.1f}%")
-    kpi2.metric("Tarjetas Amarillas Est.", f"{tarjetas_proyectadas}")
-    kpi3.metric("Remates Totales", f"{remates_totales}")
+    # 1. Tarjetas de Probabilidad 1X2 (KPIs)
+    col_res1, col_res2, col_res3 = st.columns(3)
+    col_res1.metric(f"Victoria {equipo_local}", f"{p_local_pct:.1f}%")
+    col_res2.metric("Empate (X)", f"{p_empate_pct:.1f}%")
+    col_res3.metric(f"Victoria {equipo_visitante}", f"{p_visitante_pct:.1f}%")
 
-    # Panel de Gobernanza Estructurado
+    # 2. Matriz de Gobernanza y Dictamen
     st.markdown("### 🏛️ Matriz de Gobernanza & Decisión")
     st.markdown(
         f"""
-        | Componente Táctico | Detalle de Auditoría |
+        | Indicador Clave | Resultado del Modelo |
         | :--- | :--- |
-        | **Estado de Validación** | **{estado_governance}** |
-        | **Probabilidad del Modelo ($P_m$)** | `{p_modelo:.2f}%` |
-        | **Probabilidad Implícita de Mercado** | `{p_implicita:.2f}%` |
-        | **Margen de Valor ($\Delta p$)** | `{delta_p:+.2f}%` *(Indicador de Valor Matemático)* |
-        | **Volumen de Saques de Puerta** | `{equipo_visitante}: {saques_visitante}` \| `{equipo_local}: {saques_local}` |
-        | **Fricción & Disciplina** | Coeficiente arbitral de `{friccion_arbitral}` con `{tarjetas_proyectadas}` amonestaciones estimadas. |
+        | **Dictamen de Viabilidad** | **{estado_governance}** |
+        | **Tendencia Matemática Principal** | `{'Local Favorecido' if p_local_pct > p_visitante_pct else 'Visitante Favorecido'}` ({max_p:.1f}%) |
+        | **Probabilidad No Córneres (<10')** | `{prob_no_corners:.1f}%` |
+        | **Tarjetas Amarillas Estimadas** | `{tarjetas_proyectadas}` amonestaciones |
         """
     )
-
-    # Tabla Interactiva de Protagonistas (Player Props)
-    st.markdown("### 🏃‍♂️ Rendimiento de Protagonistas Clave")
-    df_jugadores = pd.DataFrame([
-        {"Jugador": jugador_1, "Equipo": equipo_local, "Liga / Torneo": liga_seleccionada, "Remates P/G": j1_remates},
-        {"Jugador": jugador_2, "Equipo": equipo_visitante, "Liga / Torneo": liga_seleccionada, "Remates P/G": j2_remates}
-    ])
-    st.dataframe(df_jugadores, use_container_width=True)
 
     # PERSISTENCIA EN SQLITE
     conexion = sqlite3.connect(DB_NAME)
     cursor = conexion.cursor()
     cursor.execute("""
-        INSERT INTO governance_log_v32 (match_id, market_category, market_selected, model_probability, implied_probability, delta_p, governance_status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (202, f"Auditoría Unificada - {liga_seleccionada}", f"{equipo_local} vs {equipo_visitante}", round(p_modelo/100, 4), 0.50, round(delta_p/100, 4), estado_governance))
+        INSERT INTO governance_log_v32 (match_date, home_team, away_team, p_local, p_empate, p_visitante, governance_status)
+        VALUES (datetime('now'), ?, ?, ?, ?, ?, ?)
+    """, (equipo_local, equipo_visitante, round(p_local_pct, 2), round(p_empate_pct, 2), round(p_visitante_pct, 2), estado_governance))
     conexion.commit()
     conexion.close()
 
-    st.toast("Datos de gobernanza guardados en SQLite con éxito.", icon="💾")
+    st.toast("Auditoría 1X2 registrada en SQLite con éxito.", icon="💾")

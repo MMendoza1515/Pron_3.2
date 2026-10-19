@@ -12,12 +12,14 @@ st.set_page_config(
 
 DB_NAME = "pron_v32_limpio.db"
 
-# Inicialización de la base de datos SQLite
+# Inicialización segura de la base de datos SQLite (recrea la tabla si cambió la estructura)
 def inicializar_db():
     conexion = sqlite3.connect(DB_NAME)
     cursor = conexion.cursor()
+    # Opcional: aseguramos limpiar la tabla antigua para evitar conflictos de columnas
+    cursor.execute("DROP TABLE IF EXISTS governance_log_v32")
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS governance_log_v32 (
+        CREATE TABLE governance_log_v32 (
             log_id INTEGER PRIMARY KEY AUTOINCREMENT,
             match_date TEXT, home_team TEXT, away_team TEXT,
             p_local REAL, p_empate REAL, p_visitante REAL, governance_status TEXT

@@ -121,50 +121,35 @@ with col_eq2:
 
 st.divider()
 
-# --- SECCIÓN 2: VARIABLES Y PARÁMETROS TÁCTICOS CON LLAVES DINÁMICAS ---
-st.subheader("2. Variables y Parámetros Tácticos")
+# --- SECCIÓN 2: FORMULARIO DE VARIABLES TÁCTICAS ---
+# El formulario encapsula los inputs y evita recargas a medias; los datos solo viajan al hacer clic en el botón de submit.
+with st.form("form_auditoria"):
+    st.subheader("2. Variables y Parámetros Tácticos")
 
-# Llave compuesta única por cada combinación de partido para obligar a limpiar y reiniciar inputs
-match_id_key = f"{liga_seleccionada}_{equipo_local}_{equipo_visitante}"
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05)
+        remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5)
+        lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5)
+    with col_m2:
+        lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05)
+        remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5)
+        friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05)
 
-col_m1, col_m2 = st.columns(2)
-with col_m1:
-    lambda_local = st.number_input(f"xG Esperados [{equipo_local}]", value=1.55, step=0.05, key=f"xg_l_{match_id_key}")
-    remates_local = st.number_input(f"Remates Proyectados [{equipo_local}]", value=13.0, step=0.5, key=f"rem_l_{match_id_key}")
-    lambda_corners = st.number_input("λ Córneres Totales", value=9.5, step=0.5, key=f"corn_{match_id_key}")
-with col_m2:
-    lambda_visitante = st.number_input(f"xG Esperados [{equipo_visitante}]", value=1.10, step=0.05, key=f"xg_v_{match_id_key}")
-    remates_visitante = st.number_input(f"Remates Proyectados [{equipo_visitante}]", value=11.5, step=0.5, key=f"rem_v_{match_id_key}")
-    friccion_arbitral = st.slider("Índice de Fricción Arbitral / Tarjetas", min_value=0.80, max_value=2.00, value=1.20, step=0.05, key=f"fric_{match_id_key}")
+    st.markdown("#### 🏃‍♂️ Protagonistas Clave (Player Props)")
+    col_j1, col_j2 = st.columns(2)
+    with col_j1:
+        jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local")
+        j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1)
+    with col_j2:
+        jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante")
+        j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1)
 
-# Protagonistas Clave (Player Props)
-st.markdown("#### 🏃‍♂️ Protagonistas Clave (Player Props)")
-col_j1, col_j2 = st.columns(2)
-with col_j1:
-    jugador_1 = st.text_input(f"Estrella [{equipo_local}]", value="Delantero Local", key=f"j1_name_{match_id_key}")
-    j1_remates = st.number_input(f"Remates P/G ({equipo_local})", value=3.2, step=0.1, key=f"j1_rem_{match_id_key}")
-with col_j2:
-    jugador_2 = st.text_input(f"Estrella [{equipo_visitante}]", value="Delantero Visitante", key=f"j2_name_{match_id_key}")
-    j2_remates = st.number_input(f"Remates P/G ({equipo_visitante})", value=2.8, step=0.1, key=f"j2_rem_{match_id_key}")
+    # Botón de ejecución dentro del formulario
+    submit_auditoria = st.form_submit_button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True)
 
-st.divider()
-
-# --- CONTROL DE ESTADO PARA EJECUCIÓN BAJO DEMANDA ---
-if 'auditoria_ejecutada' not in st.session_state:
-    st.session_state.auditoria_ejecutada = False
-
-# Si cambia el partido, apagamos el estado anterior para limpiar la pantalla de resultados viejos
-if 'partido_previo' not in st.session_state:
-    st.session_state.partido_previo = match_id_key
-
-if st.session_state.partido_previo != match_id_key:
-    st.session_state.partido_previo = match_id_key
-    st.session_state.auditoria_ejecutada = False
-
-# --- BOTÓN DE EJECUCIÓN PRINCIPAL ---
-if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_container_width=True):
-    st.session_state.auditoria_ejecutada = True
-    
+# --- PROCESAMIENTO Y ACTUALIZACIÓN AL DAR CLIC ---
+if submit_auditoria:
     # --- CÁLCULO DE POISSON 1X2 (BARRIDO HASTA 6x6) ---
     max_goles = 6
     prob_local_win = 0.0
@@ -186,28 +171,39 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_contai
 
     # Normalización porcentual 1X2
     total_prob = prob_local_win + prob_empate + prob_visitante_win
-    st.session_state.p_local_pct = (prob_local_win / total_prob) * 100
-    st.session_state.p_empate_pct = (prob_empate / total_prob) * 100
-    st.session_state.p_visitante_pct = (prob_visitante_win / total_prob) * 100
+    p_local_pct = (prob_local_win / total_prob) * 100
+    p_empate_pct = (prob_empate / total_prob) * 100
+    p_visitante_pct = (prob_visitante_win / total_prob) * 100
 
     # Lógica de Gobernanza y Clasificación
-    max_p = max(st.session_state.p_local_pct, st.session_state.p_empate_pct, st.session_state.p_visitante_pct)
+    max_p = max(p_local_pct, p_empate_pct, p_visitante_pct)
     if max_p >= 55.0:
-        st.session_state.estado_governance = "⭐ APROBADO ESTELAR (Alta Certeza)"
+        estado_governance = "⭐ APROBADO ESTELAR (Alta Certeza)"
     elif max_p >= 42.0:
-        st.session_state.estado_governance = "✅ APROBADO BASE (Valor Moderado)"
+        estado_governance = "✅ APROBADO BASE (Valor Moderado)"
     else:
-        st.session_state.estado_governance = "⚠️ REVISAR RIESGO (Alta Incertidumbre)"
+        estado_governance = "⚠️ REVISAR RIESGO (Alta Incertidumbre)"
 
     # Dinámica Secundaria (Saques de puerta y tarjetas)
     t_puerta_local = round(remates_local * 0.38, 1)
     t_puerta_visitante = round(remates_visitante * 0.38, 1)
-    st.session_state.saques_visitante = round(remates_local - t_puerta_local, 1)
-    st.session_state.saques_local = round(remates_visitante - t_puerta_visitante, 1)
+    saques_visitante = round(remates_local - t_puerta_local, 1)
+    saques_local = round(remates_visitante - t_puerta_visitante, 1)
     
     lambda_10min = lambda_corners * (10 / 90)
-    st.session_state.prob_no_corners = ((math.exp(-lambda_10min) * (lambda_10min ** 0)) / math.factorial(0)) * 100
-    st.session_state.tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
+    prob_no_corners = ((math.exp(-lambda_10min) * (lambda_10min ** 0)) / math.factorial(0)) * 100
+    tarjetas_proyectadas = round(4.2 * friccion_arbitral, 1)
+
+    # Guardamos en session_state para mantener la visualización activa
+    st.session_state.p_local_pct = p_local_pct
+    st.session_state.p_empate_pct = p_empate_pct
+    st.session_state.p_visitante_pct = p_visitante_pct
+    st.session_state.estado_governance = estado_governance
+    st.session_state.saques_local = saques_local
+    st.session_state.saques_visitante = saques_visitante
+    st.session_state.prob_no_corners = prob_no_corners
+    st.session_state.tarjetas_proyectadas = tarjetas_proyectadas
+    st.session_state.datos_activos = True
 
     # PERSISTENCIA EN SQLITE
     conexion = sqlite3.connect(DB_NAME)
@@ -215,13 +211,13 @@ if st.button("🚀 Ejecutar Auditoría Integral Pro", type="primary", use_contai
     cursor.execute("""
         INSERT INTO governance_log_v32 (match_date, home_team, away_team, p_local, p_empate, p_visitante, governance_status)
         VALUES (datetime('now'), ?, ?, ?, ?, ?, ?)
-    """, (equipo_local, equipo_visitante, round(st.session_state.p_local_pct, 2), round(st.session_state.p_empate_pct, 2), round(st.session_state.p_visitante_pct, 2), st.session_state.estado_governance))
+    """, (equipo_local, equipo_visitante, round(p_local_pct, 2), round(p_empate_pct, 2), round(p_visitante_pct, 2), estado_governance))
     conexion.commit()
     conexion.close()
 
-# --- RENDERIZADO CONDICIONAL DE RESULTADOS ---
-if st.session_state.auditoria_ejecutada:
-    st.success(f"🎯 Dictamen Táctico: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
+# --- RENDERIZADO DE RESULTADOS ---
+if st.session_state.get('datos_activos', False):
+    st.success(f"🎯 Dictamen Táctico Actualizado: {equipo_local} vs {equipo_visitante} ({liga_seleccionada})")
 
     # 1. Tarjetas de Probabilidad 1X2 (KPIs)
     col_res1, col_res2, col_res3 = st.columns(3)
@@ -251,6 +247,6 @@ if st.session_state.auditoria_ejecutada:
     ])
     st.dataframe(df_jugadores, use_container_width=True)
 
-    st.toast("Auditoría generada con éxito.", icon="✅")
+    st.toast("Datos actualizados correctamente con los nuevos parámetros.", icon="🔄")
 else:
-    st.info("ℹ️ Configura los parámetros y haz clic en **'Ejecutar Auditoría Integral Pro'** para calcular los datos del partido.")
+    st.info("ℹ️ Modifica los parámetros en el formulario superior y haz clic en **'Ejecutar Auditoría Integral Pro'** para generar y actualizar los resultados.")
